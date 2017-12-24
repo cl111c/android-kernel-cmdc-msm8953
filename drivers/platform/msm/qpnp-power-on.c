@@ -30,6 +30,8 @@
 #include <linux/regulator/of_regulator.h>
 #include <linux/qpnp/power-on.h>
 
+#include <linux/hardware_info.h>
+
 #define CREATE_MASK(NUM_BITS, POS) \
 	((unsigned char) (((1 << (NUM_BITS)) - 1) << (POS)))
 #define PON_MASK(MSB_BIT, LSB_BIT) \
@@ -206,7 +208,7 @@ struct qpnp_pon {
 	int			num_pon_reg;
 	int			num_pon_config;
 	int			reg_count;
-	u32			dbc_time_us;
+	u32			dbc;
 	u32			uvlo;
 	int			warm_reset_poff_type;
 	int			hard_reset_poff_type;
@@ -218,8 +220,6 @@ struct qpnp_pon {
 	u8			warm_reset_reason2;
 	bool			is_spon;
 	bool			store_hard_reset_reason;
-	bool			kpdpwr_dbc_enable;
-	ktime_t			kpdpwr_last_release_time;
 };
 
 static struct qpnp_pon *sys_reset_dev;
@@ -392,7 +392,7 @@ static int qpnp_pon_set_dbc(struct qpnp_pon *pon, u32 delay)
 	int rc = 0;
 	u32 delay_reg;
 
-	if (delay == pon->dbc_time_us)
+	if (delay == pon->dbc)
 		goto out;
 	if (pon->pon_input)
 		mutex_lock(&pon->pon_input->mutex);
@@ -412,7 +412,7 @@ static int qpnp_pon_set_dbc(struct qpnp_pon *pon, u32 delay)
 		goto unlock;
 	}
 
-	pon->dbc_time_us = delay;
+	pon->dbc = delay;
 
 unlock:
 	if (pon->pon_input)
@@ -421,31 +421,12 @@ out:
 	return rc;
 }
 
-static int qpnp_pon_get_dbc(struct qpnp_pon *pon, u32 *delay)
-{
-	int rc;
-	u8 val;
-
-	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
-					QPNP_PON_DBC_CTL(pon), &val, 1);
-	if (rc) {
-		pr_err("Unable to read pon_dbc_ctl rc=%d\n", rc);
-		return rc;
-	}
-	val &= QPNP_PON_DBC_DELAY_MASK(pon);
-
-	*delay = USEC_PER_SEC /
-		(1 << (QPNP_PON_DELAY_BIT_SHIFT - val));
-
-	return rc;
-}
-
 static ssize_t qpnp_pon_dbc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct qpnp_pon *pon = dev_get_drvdata(dev);
 
-	return snprintf(buf, QPNP_PON_BUFFER_SIZE, "%d\n", pon->dbc_time_us);
+	return snprintf(buf, QPNP_PON_BUFFER_SIZE, "%d\n", pon->dbc);
 }
 
 static ssize_t qpnp_pon_dbc_store(struct device *dev,
@@ -778,7 +759,6 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	struct qpnp_pon_config *cfg = NULL;
 	u8 pon_rt_sts = 0, pon_rt_bit = 0;
 	u32 key_status;
-	u64 elapsed_us;
 
 	cfg = qpnp_get_cfg(pon, pon_type);
 	if (!cfg)
@@ -787,15 +767,6 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	/* Check if key reporting is supported */
 	if (!cfg->key_code)
 		return 0;
-
-	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
-		elapsed_us = ktime_us_delta(ktime_get(),
-				pon->kpdpwr_last_release_time);
-		if (elapsed_us < pon->dbc_time_us) {
-			pr_debug("Ignoring kpdpwr event - within debounce time\n");
-			return 0;
-		}
-	}
 
 	/* check the RT status to get the current status of the line */
 	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
@@ -825,11 +796,6 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	pr_debug("PMIC input: code=%d, sts=0x%hhx\n",
 					cfg->key_code, pon_rt_sts);
 	key_status = pon_rt_sts & pon_rt_bit;
-
-	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
-		if (!key_status)
-			pon->kpdpwr_last_release_time = ktime_get();
-	}
 
 	/* simulate press event in case release event occured
 	 * without a press event
@@ -1962,6 +1928,36 @@ static int read_gen2_pon_off_reason(struct qpnp_pon *pon, u16 *reason,
 
 	return 0;
 }
+//Other_SYS, heming.wt, add board id info into lk, 2014/12/03, begin
+extern char board_id[HARDWARE_MAX_ITEM_LONGTH];
+void probe_board_and_set(void)
+{
+	char* boadrid_start, *boardvol_start;
+  char boardid_info[HARDWARE_MAX_ITEM_LONGTH];
+  
+	boadrid_start = strstr(saved_command_line,"board_id=");
+	boardvol_start = strstr(saved_command_line,"board_vol=");
+	memset(boardid_info, 0, HARDWARE_MAX_ITEM_LONGTH);
+	if(boadrid_start != NULL)
+	{
+		boardvol_start = strstr(boadrid_start,":board_vol=");
+		if(boardvol_start != NULL)
+		{
+			strncpy(boardid_info, boadrid_start+sizeof("board_id=")-1, boardvol_start-(boadrid_start+sizeof("board_id=")-1));//skip the header "board_id="
+		}
+		else
+		{
+			strncpy(boardid_info, boadrid_start+sizeof("board_id=")-1, 8);//skip the header "board_id="
+		}
+	}
+	else
+	{
+		sprintf(boardid_info, "boarid not define!");
+	}
+	//hardwareinfo_set_prop(HARDWARE_BOARD_ID, boardid_info);
+	strcpy(board_id, boardid_info);
+}
+//Other_SYS, heming.wt, add board id info into lk, 2014/12/03, end
 
 static int qpnp_pon_probe(struct spmi_device *spmi)
 {
@@ -1976,6 +1972,8 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	const char *s3_src;
 	u8 s3_src_reg;
 	unsigned long flags;
+	
+	printk("heming add qpnp_pon_probe\n");
 
 	pon = devm_kzalloc(&spmi->dev, sizeof(struct qpnp_pon),
 							GFP_KERNEL);
@@ -2230,21 +2228,7 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 		}
 	} else {
 		rc = qpnp_pon_set_dbc(pon, delay);
-		if (rc) {
-			dev_err(&spmi->dev,
-				"Unable to set PON debounce delay rc=%d\n", rc);
-			return rc;
-		}
 	}
-	rc = qpnp_pon_get_dbc(pon, &pon->dbc_time_us);
-	if (rc) {
-		dev_err(&spmi->dev,
-			"Unable to get PON debounce delay rc=%d\n", rc);
-		return rc;
-	}
-
-	pon->kpdpwr_dbc_enable = of_property_read_bool(pon->spmi->dev.of_node,
-					"qcom,kpdpwr-sw-debounce");
 
 	rc = of_property_read_u32(pon->spmi->dev.of_node,
 				"qcom,warm-reset-poweroff-type",
@@ -2302,15 +2286,6 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	}
 
 	if (of_property_read_bool(spmi->dev.of_node,
-					"qcom,pon-reset-off")) {
-		rc = qpnp_pon_trigger_config(PON_CBLPWR_N, false);
-		if (rc) {
-			dev_err(&spmi->dev, "failed update the PON_CBLPWR %d\n",
-				rc);
-		}
-	}
-
-	if (of_property_read_bool(spmi->dev.of_node,
 					"qcom,secondary-pon-reset")) {
 		if (sys_reset) {
 			dev_err(&spmi->dev, "qcom,system-reset property shouldn't be used along with qcom,secondary-pon-reset property\n");
@@ -2330,6 +2305,10 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 					"qcom,store-hard-reset-reason");
 
 	qpnp_pon_debugfs_init(spmi);
+//Other_SYS, heming.wt, add board id info into lk, 2014/12/03, begin	
+	probe_board_and_set();
+	printk("heming add qpnp_pon_probe end\n");
+//Other_SYS, heming.wt, add board id info into lk, 2014/12/03, end
 	return 0;
 }
 
