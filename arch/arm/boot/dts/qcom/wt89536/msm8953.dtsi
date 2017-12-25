@@ -34,6 +34,12 @@
 		other_ext_mem: other_ext_region@0 {
 			compatible = "removed-dma-pool";
 			no-map;
+			reg = <0x0 0x84A00000 0x0 0x1E00000>;
+		};
+
+		modem_mem: modem_region@0 {
+			compatible = "removed-dma-pool";
+			no-map-fixup;
 			reg = <0x0 0x86c00000 0x0 0x6a00000>;
 		};
 
@@ -141,7 +147,7 @@
 #include "../msm8953-bus.dtsi"
 #include "../msm8953-iommu-domains.dtsi"
 #include "../msm8953-vidc.dtsi"
-#include "msm8953-pm.dtsi"
+#include "../msm8953-pm.dtsi"
 
 &soc {
 	#address-cells = <1>;
@@ -2354,6 +2360,7 @@
 #include "../msm-pm8953-rpm-regulator.dtsi"
 #include "msm-pm8953.dtsi"
 #include "msm8953-regulator.dtsi"
+#include "msm-pmi8950.dtsi"
 #include "msm-audio.dtsi"
 #include "msm8953-audio.dtsi"
 #include "../msm-gdsc-8916.dtsi"

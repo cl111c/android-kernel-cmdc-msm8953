@@ -26,7 +26,7 @@
 / {
 	qrd_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
-		#include "wt89536/batterydata-qrd-sku1-4v4-2800mah.dtsi"
+		#include "batterydata-qrd-sku1-4v4-2800mah.dtsi"
 		#include "wt89536/B5W-qrd-Coslight-4v4-4000mah.dtsi"
 		//Other_modify 20160402 xuji.wt Add ZCV table
 	};
