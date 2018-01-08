@@ -13,9 +13,9 @@
 
 /dts-v1/;
 
-#include "wt89536/msm8953.dtsi"
+#include "msm8953.dtsi"
 #include "msm8953-qrd-wt88553.dtsi"
-#include "wt89536/msm8953-audio-mtp.dtsi"
+#include "msm8953-audio-mtp.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. MSMTITANIUM QRD WT88553";
@@ -27,7 +27,7 @@
 	qrd_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
 		#include "batterydata-qrd-sku1-4v4-2800mah.dtsi"
-		#include "wt89536/B5W-qrd-Coslight-4v4-4000mah.dtsi"
+		#include "B5W-qrd-Coslight-4v4-4000mah.dtsi"
 		//Other_modify 20160402 xuji.wt Add ZCV table
 	};
 };

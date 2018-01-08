@@ -11,12 +11,12 @@
  * GNU General Public License for more details.
  */
 
-#include "wt89536/msm8953-qrd.dtsi"
-#include "wt89536/dsi-panel-nt35521s-ebbg-720p-video.dtsi"
-#include "wt89536/dsi-panel-nt35596-ebbg-1080p-video.dtsi"
-#include "wt89536/dsi-panel-r63350-tianma-1080p-video.dtsi"
-#include "wt89536/dsi-panel-otm1901a-dj-1080p-video.dtsi"
-#include "wt89536/dsi-panel-otm1901a-dj-1080p-video_otp.dtsi"
+#include "msm8953-qrd.dtsi"
+#include "dsi-panel-nt35521s-ebbg-720p-video.dtsi"
+#include "dsi-panel-nt35596-ebbg-1080p-video.dtsi"
+#include "dsi-panel-r63350-tianma-1080p-video.dtsi"
+#include "dsi-panel-otm1901a-dj-1080p-video.dtsi"
+#include "dsi-panel-otm1901a-dj-1080p-video_otp.dtsi"
 
 
 &spmi_bus {
